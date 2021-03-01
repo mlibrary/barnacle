@@ -12,7 +12,7 @@ module Chipmunk
     end
 
     def for(package)
-      File.join(root_path, package.user.username, package.bag_id)
+      File.join(root_path, package.username, package.identifier)
     end
 
     private

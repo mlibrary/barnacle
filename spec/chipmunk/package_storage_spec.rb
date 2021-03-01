@@ -2,16 +2,43 @@
 
 RSpec.describe Chipmunk::PackageStorage do
   FakeBag = Struct.new(:storage_path) do
-    def self.format
+    def self.storage_format
       "bag"
     end
   end
 
   FakeZip = Struct.new(:storage_path) do
-    def self.format
+    def self.storage_format
       "zip"
     end
   end
+
+  class FakeBagReader
+    def storage_format
+      "bag"
+    end
+
+    def at(path)
+      FakeBag.new(path)
+    end
+  end
+
+  class FakeZipReader
+    def storage_format
+      "zip"
+    end
+
+    def at(path)
+      FakeZip.new(path)
+    end
+  end
+
+  class FakeBagWriter
+    def write(_obj, _path)
+      nil
+    end
+  end
+  FakeZipWriter = FakeBagWriter
 
   # TODO: Set up a "test context" that has realistic, but test-focused
   # services registered. This will offload setup of the environment from
@@ -22,22 +49,37 @@ RSpec.describe Chipmunk::PackageStorage do
   # inclusion of specific contexts in tests that need them. In this group,
   # the volumes and volume manager can be considered environmental, while the
   # packages are scenario data.
-  let(:bags)      { Chipmunk::Volume.new(name: "bags", package_type: FakeBag, root_path: "/bags") }
-  let(:zips)      { Chipmunk::Volume.new(name: "zips", package_type: FakeZip, root_path: "/zips") }
+  let(:bags) do
+    Chipmunk::Volume.new(
+      name: "bags",
+      root_path: "/bags",
+      reader: FakeBagReader.new,
+      writer: FakeBagWriter.new
+    )
+  end
+
+  let(:zips) do
+    Chipmunk::Volume.new(
+      name: "zips",
+      root_path: "/zips",
+      reader: FakeZipReader.new,
+      writer: FakeZipWriter.new
+    )
+  end
 
   before(:each) do
     allow(bags).to receive(:include?).with("/a-bag").and_return true
     allow(zips).to receive(:include?).with("/a-zip").and_return true
   end
 
-  context "with two formats registered: bag and zip" do
+  context "with two storage_formats registered: bag and zip" do
     let(:storage)   { described_class.new(volumes: [bags, zips]) }
 
-    let(:formats)   { { bag: FakeBag, zip: FakeZip } }
-    let(:bag)       { stored_package(format: "bag", storage_volume: "bags", storage_path: "/a-bag") }
-    let(:zip)       { stored_package(format: "zip", storage_volume: "zips", storage_path: "/a-zip") }
-    let(:transient) { unstored_package(format: "bag", id: "abcdef-123456") }
-    let(:badvolume) { stored_package(format: "bag", storage_volume: "notfound") }
+    let(:storage_formats) { { bag: FakeBag, zip: FakeZip } }
+    let(:bag)       { stored_package(storage_format: "bag", storage_volume: "bags", storage_path: "/a-bag") }
+    let(:zip)       { stored_package(storage_format: "zip", storage_volume: "zips", storage_path: "/a-zip") }
+    let(:transient) { unstored_package(storage_format: "bag", id: "abcdef-123456") }
+    let(:badvolume) { stored_package(storage_format: "bag", storage_volume: "notfound") }
 
     let(:bag_proxy) { storage.for(bag) }
     let(:zip_proxy) { storage.for(zip) }
@@ -71,40 +113,39 @@ RSpec.describe Chipmunk::PackageStorage do
     context "with a good bag" do
       subject(:storage) { described_class.new(volumes: [bags]) }
 
-      let(:package)  { spy(:package, format: "bag", bag_id: "abcdef-123456") }
+      let(:package)  { spy(:package, storage_format: "bag", identifier: "abcdef-123456") }
       let(:disk_bag) { double(:bag, path: "/uploaded/abcdef-123456") }
 
-      before(:each) do
-        allow(FileUtils).to receive(:mkdir_p).with("/bags/ab/cd/ef/abcdef-123456")
-        allow(File).to receive(:rename).with("/uploaded/abcdef-123456", "/bags/ab/cd/ef/abcdef-123456")
-      end
-
-      it "ensures the destination directory exists" do
-        expect(FileUtils).to receive(:mkdir_p)
-        storage.write(package, disk_bag)
-      end
-
       it "moves the source bag to the destination directory" do
-        expect(File).to receive(:rename)
-        storage.write(package, disk_bag)
+        # TODO: This test is probably less specific than originally intended; setting
+        # an expection also adds an implicit allow(...) for the expectation. Here,
+        # originally it just expected File.rename to be called, regardless of args.
+        # Indeed, there seems to be a bit of a mismatch with these arguments across
+        # the few files concerned with it; somtimes they're bags, sometimes they're
+        # paths. We should be careful to make that clear so no issues get past
+        # testing. For the time being, I have left the expectation with the original
+        # specificity.
+        expect(bags).to receive(:write)
+        storage.write(package, disk_bag) {}
       end
 
-      it "sets the storage_volume" do
-        expect(package).to receive(:update).with(a_hash_including(storage_volume: "bags"))
-        storage.write(package, disk_bag)
+      it "yields the storage_volume" do
+        storage.write(package, disk_bag) do |actual_storage_volume, _|
+          expect(actual_storage_volume).to eql(bags)
+        end
       end
 
-      it "sets the storage_path with three levels of hierarchy" do
-        expect(package).to receive(:update)
-          .with(a_hash_including(storage_path: "/ab/cd/ef/abcdef-123456"))
-        storage.write(package, disk_bag)
+      it "yields the storage_path" do
+        storage.write(package, disk_bag) do |_, actual_storage_path|
+          expect(actual_storage_path).to eql("/ab/cd/ef/abcdef-123456")
+        end
       end
     end
 
     context "with a badly identified bag (shorter than 6 chars)" do
       subject(:storage) { described_class.new(volumes: [bags]) }
 
-      let(:package)  { double(:package, format: "bag", bag_id: "ab12") }
+      let(:package)  { double(:package, storage_format: "bag", identifier: "ab12") }
       let(:disk_bag) { double(:bag, path: "/uploaded/ab12") }
 
       it "raises an exception" do
@@ -112,10 +153,10 @@ RSpec.describe Chipmunk::PackageStorage do
       end
     end
 
-    context "with an unsupported archive format" do
+    context "with an unsupported archive storage_format" do
       subject(:storage) { described_class.new(volumes: [bags]) }
 
-      let(:package) { double(:package, format: "junk", bag_id: "id") }
+      let(:package) { double(:package, storage_format: "junk", identifier: "id") }
       let(:archive) { double(:archive) }
 
       it "raises an Unsupported Format error" do
@@ -124,11 +165,11 @@ RSpec.describe Chipmunk::PackageStorage do
     end
   end
 
-  def stored_package(format:, storage_volume: "test", storage_path: "/path")
-    double(:package, stored?: true, format: format.to_s, storage_volume: storage_volume, storage_path: storage_path)
+  def stored_package(storage_format:, storage_volume: "test", storage_path: "/path")
+    double(:package, stored?: true, storage_format: storage_format.to_s, storage_volume: storage_volume, storage_path: storage_path)
   end
 
-  def unstored_package(format:, id:)
-    double(:package, stored?: false, storage_volume: nil, storage_path: nil, format: format, bag_id: id)
+  def unstored_package(storage_format:, id:)
+    double(:package, stored?: false, storage_volume: nil, storage_path: nil, storage_format: storage_format, identifier: id)
   end
 end

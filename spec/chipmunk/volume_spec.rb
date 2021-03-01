@@ -3,12 +3,20 @@
 require "pathname"
 
 RSpec.describe Chipmunk::Volume do
-  subject(:volume) { described_class.new(name: name, package_type: package_type, root_path: root_path) }
+  subject(:volume) do
+    described_class.new(
+      name: name,
+      root_path: root_path,
+      reader: reader,
+      writer: writer
+    )
+  end
 
   context "when given valid attributes" do
     let(:name)         { "vol" }
     let(:proxy)        { double(:storage_proxy) }
-    let(:package_type) { double("SomeFormat", new: proxy, format: "some-pkg") }
+    let(:reader)       { double(:reader, at: proxy, storage_format: "some-pkg") }
+    let(:writer)       { double(:writer, write: nil) }
     let(:root_path)    { "/path" }
 
     it "has the correct name" do
@@ -17,6 +25,10 @@ RSpec.describe Chipmunk::Volume do
 
     it "has the correct format" do
       expect(volume.format).to eq "some-pkg"
+    end
+
+    it "has the correct storage_format" do
+      expect(volume.storage_format).to eq "some-pkg"
     end
 
     it "has the correct root path" do
@@ -56,8 +68,9 @@ RSpec.describe Chipmunk::Volume do
   end
 
   context "when given a blank name" do
-    let(:name)         { "" }
-    let(:package_type) { double("SomeFormat", new: nil, format: "some-pkg") }
+    let(:name) { "" }
+    let(:reader) { double(:reader, at: nil, format: "some-pkg") }
+    let(:writer)       { double(:writer, write: nil, format: "some-pkg") }
     let(:root_path)    { "/path" }
 
     it "raises an argument error that the name must not be blank" do
@@ -66,8 +79,9 @@ RSpec.describe Chipmunk::Volume do
   end
 
   context "when given a relative path" do
-    let(:name)         { "vol" }
-    let(:package_type) { double("SomeFormat", new: nil, format: "some-pkg") }
+    let(:name) { "vol" }
+    let(:reader) { double(:reader, at: nil, format: "some-pkg") }
+    let(:writer)       { double(:writer, write: nil, format: "some-pkg") }
     let(:root_path)    { "relative/path" }
 
     it "raises an argument error that path must be absolute" do

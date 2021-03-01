@@ -30,28 +30,28 @@ class BagMoveJob < ApplicationJob
   end
 
   def validate
-    package.valid_for_ingest?(errors)
+    result = Services.validation.validate(package)
+    errors.concat result.errors
+    result.valid?
   end
 
   def move_bag
     source = incoming_storage.for(package)
-    package_storage.write(package, source)
+    package_storage.write(package, source) do |volume, storage_path|
+      package.storage_volume = volume.name
+      package.storage_path = storage_path
+    end
   end
 
   def record_success
     queue_item.transaction do
-      queue_item.status = :done
-      queue_item.save!
+      queue_item.success!
       package.save!
     end
   end
 
   def record_failure
-    queue_item.transaction do
-      queue_item.error = errors.join("\n\n")
-      queue_item.status = :failed
-      queue_item.save!
-    end
+    queue_item.fail!(errors)
   end
 
   def log_exception(exception)

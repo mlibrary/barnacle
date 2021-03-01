@@ -1,12 +1,20 @@
 # frozen_string_literal: true
 
 RSpec.describe Chipmunk::IncomingStorage do
-  let(:package_type) { double("SomePackageFormat", format: "some-pkg") }
-  let(:volume) { Chipmunk::Volume.new(name: "incoming", package_type: package_type, root_path: "/incoming") }
+  let(:reader) { double(:reader, format: "some-pkg") }
+  let(:writer) { double(:writer, format: "some-pkg") }
+  let(:volume) { Chipmunk::Volume.new(name: "incoming", writer: writer, reader: reader, root_path: "/incoming") }
   let(:path_builder) { Chipmunk::UploadPath.new("/") }
-  let(:uploader)         { instance_double("User", username: "uploader") }
-  let(:unstored_package) { instance_double("Package", stored?: false, user: uploader, bag_id: "abcdef-123456") }
-  let(:stored_package)   { instance_double("Package", stored?: true) }
+  let(:unstored_package) do
+    instance_double(
+      "Package",
+      stored?: false,
+      username: "uploader",
+      bag_id: "abcdef-123456",
+      identifier: "abcdef-123456"
+)
+  end
+  let(:stored_package) { instance_double("Package", stored?: true) }
 
   subject(:storage) do
     described_class.new(
@@ -19,12 +27,6 @@ RSpec.describe Chipmunk::IncomingStorage do
   describe "#upload_link" do
     it "reports the upload link" do
       expect(storage.upload_link(unstored_package)).to eql("rsync:foo/#{unstored_package.bag_id}")
-    end
-  end
-
-  context "with a package that is already in preservation" do
-    it "raises an already-stored error" do
-      expect { storage.for(stored_package) }.to raise_error(Chipmunk::PackageAlreadyStoredError)
     end
   end
 

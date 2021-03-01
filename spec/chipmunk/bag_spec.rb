@@ -35,6 +35,13 @@ RSpec.describe Chipmunk::Bag do
     end
   end
 
+  describe "#format" do
+    it "has the same format as the class" do
+      expect(stored_bag.format).to eql(described_class.format)
+      expect(stored_bag.format).to eql("bag")
+    end
+  end
+
   describe "#id" do
     it "returns the Bag-ID from the chipmunk-info.txt" do
       expect(stored_bag.id).to eql("14d25bcd-deaf-4c94-add7-c189fdca4692")

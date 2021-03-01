@@ -15,14 +15,16 @@ module Chipmunk
     # Create a new Volume.
     #
     # @param name [String] the name of the Volume; coerced to String
-    # @param package_type [Class] the storage class for this volume (Chipmunk::Bag)
+    # @param reader [Bag::Reader] A reader that can return the an instance of the
+    #   stored object given a path.
     # @param root_path [String|Pathname] the path to the storage root for this Volume;
     #   must be absolute; coerced to Pathname
     # @raise [ArgumentError] if the name is blank or root_path is relative
-    def initialize(name:, package_type:, root_path:)
+    def initialize(name:, root_path:, reader: Chipmunk::Bag::Reader.new, writer:)
       @name = name.to_s
-      @package_type = package_type
       @root_path = Pathname(root_path)
+      @reader = reader
+      @writer = writer
       validate!
     end
 
@@ -47,7 +49,11 @@ module Chipmunk
     def get(path)
       raise Chipmunk::PackageNotFoundError unless include?(path)
 
-      package_type.new(expand(path))
+      reader.at(expand(path))
+    end
+
+    def write(object, path)
+      writer.write(object, expand(path))
     end
 
     def include?(path)
@@ -56,16 +62,18 @@ module Chipmunk
 
     # @!attribute [r]
     #   @return [String] the format name of the items in this volume
-    def format
-      package_type.format
+    def storage_format
+      reader.storage_format
     end
+    alias_method :format, :storage_format
 
     private
 
     def validate!
       raise ArgumentError, "Volume name must not be blank" if name.strip.empty?
-      raise ArgumentError, "Volume format must not be blank" if format.to_s.strip.empty?
       raise ArgumentError, "Volume root_path must be absolute (#{root_path})" unless root_path.absolute?
+      raise ArgumentError, "Volume must specify a reader" unless reader
+      raise ArgumentError, "Volume must specify a writer" unless writer
     end
 
     # Remove any leading slashes so Pathname joins properly
@@ -73,6 +81,6 @@ module Chipmunk
       path.to_s.sub(/^\/*/, "")
     end
 
-    attr_reader :package_type
+    attr_reader :reader, :writer
   end
 end

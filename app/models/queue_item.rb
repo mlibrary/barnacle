@@ -19,6 +19,14 @@ class QueueItem < ApplicationRecord
     package.user
   end
 
+  def success!
+    update!(status: :done)
+  end
+
+  def fail!(errors)
+    update!(status: :failed, error: errors.join("\n\n"))
+  end
+
   scope :for_package, ->(package_id) { where(package_id: package_id) unless package_id.blank? }
   scope :for_packages, ->(package_scope) { joins(:package).merge(package_scope) }
   scope :recent_first, -> { order(updated_at: :desc) }

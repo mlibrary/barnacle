@@ -10,7 +10,10 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20190531175502) do
+ActiveRecord::Schema.define(version: 20190813153819) do
+
+# Could not dump table "artifacts" because of following StandardError
+#   Unknown type 'uuid' for column 'id'
 
   create_table "audits", force: :cascade do |t|
     t.integer "user_id"
@@ -18,6 +21,16 @@ ActiveRecord::Schema.define(version: 20190531175502) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["user_id"], name: "index_audits_on_user_id"
+  end
+
+  create_table "deposits", force: :cascade do |t|
+    t.string "artifact_id", null: false
+    t.integer "user_id", null: false
+    t.string "status", null: false
+    t.text "error", default: "", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_deposits_on_user_id"
   end
 
   create_table "events", force: :cascade do |t|
@@ -56,6 +69,15 @@ ActiveRecord::Schema.define(version: 20190531175502) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["package_id"], name: "index_queue_items_on_package_id"
+  end
+
+  create_table "revisions", force: :cascade do |t|
+    t.string "artifact_id", null: false
+    t.integer "deposit_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["artifact_id"], name: "index_revisions_on_artifact_id"
+    t.index ["deposit_id"], name: "index_revisions_on_deposit_id", unique: true
   end
 
   create_table "users", force: :cascade do |t|

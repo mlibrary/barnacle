@@ -5,6 +5,9 @@ rvm:
   - 2.5
   - 2.6
 
+env:
+  - RACK_ENV=test RAILS_ENV=test
+
 branches:
   only:
     - master
@@ -17,6 +20,7 @@ before_install:
 before_script:
   - bundle exec rake checkpoint:migrate
   - bundle exec rake keycard:migrate
+  - bin/rails db:migrate
 
 script:
     - bundle exec rspec

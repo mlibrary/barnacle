@@ -31,46 +31,39 @@ Chipmunk.config.upload.tap do |upload|
   end
 end
 
-Services = Canister.new
 # TODO: consult the environment-specific configuration for a set of volumes
-# TODO: Separate normal and test contexts
-if Rails.env.test?
-  Services.register(:incoming_storage) do
-    Chipmunk::IncomingStorage.new(
-      volume: Chipmunk::Volume.new(
-        name: "incoming",
-        package_type: Chipmunk::Bag,
-        root_path: Chipmunk.config.upload.upload_path
-      ),
-      paths: Chipmunk::UploadPath.new("/"),
-      links: Chipmunk::UploadPath.new(Chipmunk.config.upload["rsync_point"])
-    )
-  end
-  Services.register(:storage) do
-    Chipmunk::PackageStorage.new(volumes: [
-      Chipmunk::Volume.new(name: "test", package_type: Chipmunk::Bag, root_path: Rails.root.join("spec/support/fixtures")),
-      Chipmunk::Volume.new(name: "bags", package_type: Chipmunk::Bag, root_path: Chipmunk.config.upload.storage_path)
-    ])
-  end
-else
-  Services.register(:incoming_storage) do
-    Chipmunk::IncomingStorage.new(
-      volume: Chipmunk::Volume.new(
-        name: "incoming",
-        package_type: Chipmunk::Bag,
-        root_path: Chipmunk.config.upload.upload_path
-      ),
-      paths: Chipmunk::UserUploadPath.new("/"),
-      links: Chipmunk::UploadPath.new(Chipmunk.config.upload["rsync_point"])
-    )
-  end
-  Services.register(:storage) do
-    Chipmunk::PackageStorage.new(volumes: [
-      Chipmunk::Volume.new(name: "root", package_type: Chipmunk::Bag, root_path: "/"), # For migration purposes
-      Chipmunk::Volume.new(name: "bags", package_type: Chipmunk::Bag, root_path: Chipmunk.config.upload.storage_path)
-    ])
-  end
+Services = Canister.new
+Services.register(:incoming_storage) do
+  Chipmunk::IncomingStorage.new(
+    volume: Chipmunk::Volume.new(
+      name: "incoming",
+      reader: Chipmunk::Bag::Reader.new,
+      writer: Chipmunk::Bag::MoveWriter.new,
+      root_path: Chipmunk.config.upload.upload_path
+    ),
+    paths: Chipmunk::UserUploadPath.new("/"),
+    links: Chipmunk::UploadPath.new(Chipmunk.config.upload["rsync_point"])
+  )
 end
+
+Services.register(:storage) do
+  Chipmunk::PackageStorage.new(volumes: [
+    Chipmunk::Volume.new(
+      name: "root",
+      reader: Chipmunk::Bag::Reader.new,
+      writer: Chipmunk::Bag::MoveWriter.new,
+      root_path: "/" # For migration purposes
+    ),
+    Chipmunk::Volume.new(
+      name: "bags",
+      reader: Chipmunk::Bag::Reader.new,
+      writer: Chipmunk::Bag::MoveWriter.new,
+      root_path: Chipmunk.config.upload.storage_path
+    )
+  ])
+end
+
+Services.register(:validation) { Chipmunk::ValidationService.new }
 
 Services.register(:checkpoint) do
   Checkpoint::Authority.new(agent_resolver: KCV::AgentResolver.new,
@@ -79,3 +72,6 @@ Services.register(:checkpoint) do
 end
 
 Services.register(:notary) { Keycard::Notary.default }
+Services.register(:uuid_format) do
+  /\A[0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}\z/i
+end

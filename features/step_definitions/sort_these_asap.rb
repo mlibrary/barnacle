@@ -1,23 +1,37 @@
 # frozen_string_literal: true
 
 Given("I am a content steward") do
-  pending # Write code here that turns the phrase above into concrete actions
+  make_me_a("content_manager").on_all("audio")
 end
 
 Given("an audio object that is not in the repository") do
-  pending # Write code here that turns the phrase above into concrete actions
+  @bag = Chipmunk::Bag.new(fixture("14d25bcd-deaf-4c94-add7-c189fdca4692"))
 end
 
 When("I deposit the object as a bag") do
-  pending # Write code here that turns the phrase above into concrete actions
+  api_post(
+    "/v2/artifacts",
+    id: @bag.external_id,
+    content_type: @bag.content_type,
+    storage_format: "bag"
+  )
+
+  api_post("/v2/artifacts/#{@bag.external_id}/revisions")
+  deposit = JSON.parse(last_response.body)
+  FileUtils.cp_r @bag.bag_dir, deposit["upload_link"].split(":").last
+  api_post("/v2/deposits/#{deposit["id"]}/complete") # Should this be a put?
 end
 
 Then("it is preserved as an artifact") do
-  pending # Write code here that turns the phrase above into concrete actions
+  @artifact = Artifact.find(@bag.external_id)
+  expect(Services.storage.for(@artifact)).to be_valid
 end
 
 Then("the artifact has the identifier from within the bag") do
-  pending # Write code here that turns the phrase above into concrete actions
+  api_get(
+    "/v2/artifacts/#{@bag.external_id}/"
+  )
+  expect(last_response.successful?).to be true
 end
 
 Given("a preserved audio artifact") do

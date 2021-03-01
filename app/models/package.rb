@@ -14,15 +14,27 @@ class Package < ApplicationRecord
   def to_param
     bag_id
   end
+  alias_method :identifier, :to_param
 
   validates :bag_id, presence: true, length: { minimum: 6 }
   validates :user_id, presence: true
   validates :external_id, presence: true
-  validates :format, presence: true
+  validates :format, presence: true, format: /bag/
 
   # Declare the policy class to use for authz
   def self.policy_class
     PackagePolicy
+  end
+
+  # Rails overrides the format param on requests, so we rename this to storage_format.
+  # This alias is for backwards compatibility
+  # alias_method :storage_format, :format
+  def storage_format
+    format
+  end
+
+  def username
+    user.username
   end
 
   def upload_link
@@ -38,39 +50,6 @@ class Package < ApplicationRecord
     package_storage.for(self).path if stored?
   rescue Chipmunk::PackageNotFoundError
     storage_path
-  end
-
-  def storage_location=
-    raise "storage_location is not writable; use storage_volume and storage_path"
-  end
-
-  # TODO: This is nasty... but the storage factory checks that the package is stored,
-  # so we have to make the storage proxy manually here. Once the ingest and preservation
-  # responsibilities are clarified, this will fall out. See PFDR-184.
-  def valid_for_ingest?(errors = [])
-    if stored?
-      errors << "Package #{bag_id} is already stored"
-    elsif format != Chipmunk::Bag.format
-      errors << "Package #{bag_id} has invalid format: #{format}"
-    elsif !incoming_storage.include?(self)
-      errors << "Bag #{bag_id} does not exist in incoming storage."
-    end
-
-    return false unless errors.empty?
-
-    Chipmunk::Bag::Validator.new(self, errors, incoming_storage.for(self)).valid?
-  end
-
-  def external_validation_cmd
-    ext_cmd = Rails.application.config.validation["external"][content_type.to_s]
-    return unless ext_cmd
-
-    path = incoming_storage.for(self).path
-    [ext_cmd, external_id, path].join(" ")
-  end
-
-  def bagger_profile
-    Rails.application.config.validation["bagger_profile"][content_type.to_s]
   end
 
   def resource_type

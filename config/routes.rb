@@ -23,6 +23,13 @@ Rails.application.routes.draw do
     resources :audits, only: [:index, :create, :show]
   end
 
+  namespace :v2 do
+    resources :artifacts, only: [:index, :show, :create]
+    resources :deposits, only: [:index, :show, :create]
+    post "/artifacts/:artifact_id/revisions", controller: :deposits, action: :create
+    post "/deposits/:id/complete", controller: :deposits, action: :ready
+  end
+
   get "/login", to: "login#new", as: "login"
   post "/login", to: "login#create", as: "login_as"
   match "/logout", to: "login#destroy", as: "logout", via: [:get, :post]
