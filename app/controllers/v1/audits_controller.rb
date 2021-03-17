@@ -17,16 +17,8 @@ module V1
 
     def create
       collection_policy.new(current_user).authorize! :new?
+      audit = RepositoryAuditJob.perform_now(user: current_user)
 
-      packages = Package.stored
-      audit = Audit.new(user: current_user, packages: packages.count)
-
-      resource_policy.new(current_user, audit).authorize! :save?
-      audit.save
-
-      packages.each do |package|
-        AuditFixityCheckJob.perform_later(package: package, user: current_user, audit: audit)
-      end
       head 201, location: v1_audit_path(audit)
     end
 

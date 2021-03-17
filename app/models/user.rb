@@ -12,6 +12,10 @@ class User < ApplicationRecord
   # Assign an API key
   after_initialize :add_key, on: :create
 
+  def self.system_user
+    new(username: "(system)", email: Chipmunk.config["admin_email"])
+  end
+
   def api_key
     @api_key ||= if [nil, "x"].include?(api_key_digest)
       Keycard::DigestKey.new

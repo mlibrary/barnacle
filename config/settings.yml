@@ -5,3 +5,6 @@ allow_impersonation: false
 
 # Session inactivity timeout; default to one hour
 session_timeout: 3600
+
+# Sys Admin email (used for system audit)
+admin_email: darkblue-notification@umich.edu
