@@ -13,7 +13,7 @@ git_source(:github) do |repo_name|
 end
 
 gem "nio4r", "= 2.5.2"
-gem "puma", "= 4.3.5"
+gem "puma", "4.3.8"
 
 gem "bagit"
 gem "bcrypt", "~> 3.1.7"
